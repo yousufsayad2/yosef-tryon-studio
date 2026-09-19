@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#07080d" />
+  <title>Yosef Try-On Studio</title>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+:root{
+  --bg:#07080d;--panel:#10121a;--panel2:#151824;--line:#272b3b;
+  --text:#f7f7fb;--muted:#9da2b4;--accent:#8b5cf6;--accent2:#ec4899;
+  --good:#53e0a5;--shadow:0 25px 80px rgba(0,0,0,.38)
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 50% -20%,#25203c 0,#0b0c13 42%,#07080d 75%);color:var(--text);font-family:Cairo,Arial,sans-serif;min-height:100vh;overflow-x:hidden}
+.bg-orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.18;pointer-events:none}.orb-a{width:300px;height:300px;background:#7c3aed;left:-120px;top:280px}.orb-b{width:280px;height:280px;background:#ec4899;right:-100px;top:680px}
+.topbar{height:76px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;padding:0 5vw;backdrop-filter:blur(18px);background:rgba(7,8,13,.66);position:sticky;top:0;z-index:20}
+.brand{display:flex;gap:10px;align-items:center}.brand-mark{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-weight:800}.brand-name{font-weight:800}.brand-name span{color:#b7a0ff}.brand-sub{font-size:10px;color:var(--muted);letter-spacing:1.2px}
+nav{display:flex;gap:30px}nav a{color:#bfc3d1;text-decoration:none;font-size:14px}nav a:hover{color:white}.ghost-btn,.icon-btn,.secondary{background:#171a24;color:#dfe2ec;border:1px solid var(--line);border-radius:12px;padding:9px 14px;font-family:inherit;cursor:pointer}
+.shell{width:min(1180px,92vw);margin:auto}.hero{padding:72px 0 46px;display:grid;grid-template-columns:1.1fr .9fr;gap:50px;align-items:center}.eyebrow{font-size:12px;color:#bda9ff;letter-spacing:1.5px;font-weight:800}.pulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 14px var(--good);margin-left:7px}
+h1{font-size:clamp(38px,5vw,66px);line-height:1.15;margin:18px 0}.hero h1 span{background:linear-gradient(90deg,#fff,#b9a0ff,#f28cc5);-webkit-background-clip:text;color:transparent}.hero p{color:var(--muted);max-width:680px;line-height:1.9;font-size:16px}.hero-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}.hero-pills span{background:#11141e;border:1px solid #252a39;border-radius:99px;padding:8px 12px;color:#cdd0dc;font-size:12px}
+.hero-card{background:linear-gradient(145deg,#151826,#0d0f16);border:1px solid #2a2e40;border-radius:26px;padding:22px;box-shadow:var(--shadow)}.hero-grid{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:8px;align-items:center}.mini-card{background:#0b0d13;border:1px solid #252a38;border-radius:18px;padding:10px}.mini-card b{font-size:10px;color:#8f94a6}.mini-card span{display:block;font-size:11px;margin:5px 0 9px}.mini-photo{height:190px;border-radius:13px;background-size:cover;background-position:center}.person{background:linear-gradient(#303340,#171922),url('/1001646374.jpg');background-blend-mode:soft-light}.outfit{background:linear-gradient(#42374d,#191722),url('/1001646375.jpg');background-size:cover}.result{background:linear-gradient(135deg,#4c3670,#21182e)}.arrow{color:#74798c}
+
+.studio-card{background:rgba(14,16,23,.82);border:1px solid #2a2e3e;border-radius:28px;box-shadow:var(--shadow);overflow:hidden}.tabs{display:flex;padding:8px;border-bottom:1px solid #272b39;gap:8px}.tab{border:0;background:transparent;color:#9297aa;padding:13px 24px;border-radius:12px;font-family:inherit;font-weight:700;cursor:pointer}.tab.active{background:#23263a;color:white;box-shadow:inset 0 0 0 1px #383c55}.workspace{display:grid;grid-template-columns:390px 1fr;min-height:710px}.panel{padding:24px;border-left:1px solid #272b39}.step{display:flex;gap:10px;align-items:center;margin:7px 0 10px}.step>span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#272a3a;color:#b9adff;font-size:12px;font-weight:800}.step small{display:block;color:#7f8497;font-size:10px}
+.upload-box{display:block;border:1px dashed #3a3f53;background:#11141d;border-radius:16px;min-height:150px;padding:18px;text-align:center;cursor:pointer;transition:.2s;position:relative;overflow:hidden}.upload-box:hover{border-color:#8b5cf6;background:#151827}.upload-icon{width:38px;height:38px;border-radius:12px;background:#22263a;display:grid;place-items:center;margin:3px auto 9px;font-size:23px}.upload-box strong{display:block;font-size:13px}.upload-box span{display:block;color:#73798c;font-size:10px;margin-top:3px}.preview{max-height:165px;max-width:100%;border-radius:11px;margin-top:10px;object-fit:contain}.upload-box.has-file .upload-icon,.upload-box.has-file strong,.upload-box.has-file>span{display:none}.hidden{display:none!important}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:17px}.settings label{font-size:10px;color:#858a9d}.settings select{display:block;width:100%;margin-top:5px;background:#171a24;border:1px solid #2a2e3e;color:white;padding:10px;border-radius:10px;font-family:inherit;font-size:11px}.generate{width:100%;margin-top:17px;border:0;border-radius:13px;padding:14px;background:linear-gradient(90deg,#7c3aed,#ec4899);color:white;font-family:inherit;font-weight:800;cursor:pointer;box-shadow:0 10px 30px rgba(139,92,246,.25)}.generate:disabled{opacity:.55;cursor:not-allowed}.status{font-size:11px;color:#9297a8;text-align:center;min-height:25px;padding-top:9px}
+
+.result-panel{padding:24px;display:flex;flex-direction:column}.result-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.result-head b{display:block}.result-head span{display:block;color:#74798c;font-size:11px}.canvas{flex:1;min-height:560px;border-radius:20px;background:radial-gradient(circle at 50% 20%,#25283a,#0c0e14 62%);border:1px solid #272b3b;display:grid;place-items:center;position:relative;overflow:hidden}.empty-state{text-align:center;color:#777c8d;padding:30px}.spark{font-size:45px;color:#bda9ff}.empty-state h3{color:#e9eaf0;margin:8px 0}.empty-state p{font-size:12px;max-width:320px;line-height:1.7}.loading{text-align:center;display:grid;gap:8px}.loading span{color:#7f8495;font-size:11px}.loader{width:48px;height:48px;border:3px solid #292d3d;border-top-color:#b18cff;border-radius:50%;animation:spin 1s linear infinite;margin:auto}@keyframes spin{to{transform:rotate(360deg)}}
+.demo-result{position:relative;height:100%;width:100%;min-height:560px;display:grid;place-items:center}.demo-result>img{max-height:100%;max-width:78%;object-fit:contain;border-radius:12px}.outfit-overlay{position:absolute;width:34%;top:28%;left:33%;opacity:.68;mix-blend-mode:screen;filter:saturate(1.2);pointer-events:none}.outfit-overlay img{width:100%;height:auto}.result-badge{position:absolute;top:15px;right:15px;background:rgba(0,0,0,.55);border:1px solid #555a70;border-radius:99px;padding:6px 10px;font-size:9px;letter-spacing:1px;z-index:2}.demo-note{position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,.62);border:1px solid #34394b;padding:7px 10px;border-radius:9px;font-size:9px;color:#bfc3d0}.result-actions{display:flex;gap:9px;margin-top:14px}.secondary{font-size:11px}.secondary:disabled{opacity:.4}
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0 70px}.info-card{background:#0e1017;border:1px solid #252a39;border-radius:18px;padding:22px}.info-card .num{color:#a98cff;font-size:11px}.info-card h3{margin:9px 0 5px}.info-card p{color:#858a9c;font-size:12px;line-height:1.7}.history{padding-bottom:80px}.section-head{display:flex;justify-content:space-between;align-items:center}.section-head h2{font-size:22px}.section-head span{font-size:11px;color:#777c8d}.history-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.history-item{height:190px;background:#10121a;border:1px solid #272b39;border-radius:15px;overflow:hidden}.history-item img{width:100%;height:100%;object-fit:cover}.history-empty{color:#707587;font-size:12px;border:1px dashed #303548;border-radius:15px;padding:30px;text-align:center;grid-column:1/-1}
+footer{border-top:1px solid #1e222e;text-align:center;color:#616678;padding:24px;font-size:11px}
+@media(max-width:900px){nav{display:none}.hero{grid-template-columns:1fr;padding-top:45px}.hero-card{display:none}.workspace{grid-template-columns:1fr}.panel{border-left:0;border-bottom:1px solid #272b39}.canvas{min-height:500px}.info-grid{grid-template-columns:1fr}.history-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:520px){.topbar{padding:0 4vw}.shell{width:94vw}h1{font-size:37px}.studio-card{border-radius:20px}.panel,.result-panel{padding:15px}.settings{grid-template-columns:1fr}.hero-pills{display:none}.canvas{min-height:430px}.demo-result{min-height:430px}.outfit-overlay{width:40%;left:30%}}
+
+  </style>
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">Y</div>
+      <div>
+        <div class="brand-name">Yosef <span>Try-On</span></div>
+        <div class="brand-sub">AI Virtual Studio</div>
+      </div>
+    </div>
+    <nav>
+      <a href="#studio">الاستوديو</a>
+      <a href="#how">إزاي بيشتغل؟</a>
+      <a href="#history">النتائج</a>
+    </nav>
+    <button class="ghost-btn" id="modeBtn">Demo Mode</button>
+  </header>
+
+  <main id="studio" class="shell">
+    <section class="hero">
+      <div>
+        <div class="eyebrow"><span class="pulse"></span> AI VIRTUAL TRY-ON</div>
+        <h1>جرّب اللبس على <span>صورتك</span><br/>وشوف النتيجة كصورة أو فيديو.</h1>
+        <p>ارفع صورتك، صورة اللبس، ولو عايز فيديو ارفع فيديو حركة. الواجهة مجهزة لتوصيلها بمزود AI مثل Higgsfield من السيرفر.</p>
+        <div class="hero-pills">
+          <span>📸 Photo Try-On</span>
+          <span>🎬 Video Motion</span>
+          <span>⚡ Fast Preview</span>
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-grid">
+          <div class="mini-card"><b>01</b><span>صورتك</span><div class="mini-photo person"></div></div>
+          <div class="arrow">→</div>
+          <div class="mini-card"><b>02</b><span>اللبس</span><div class="mini-photo outfit"></div></div>
+          <div class="arrow">→</div>
+          <div class="mini-card"><b>03</b><span>النتيجة</span><div class="mini-photo result"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="studio-card">
+      <div class="tabs">
+        <button class="tab active" data-tab="image">📸 صورة</button>
+        <button class="tab" data-tab="video">🎬 فيديو</button>
+      </div>
+
+      <div class="workspace">
+        <aside class="panel">
+          <div class="step"><span>1</span><div><b>صورتك</b><small>صورة واضحة للجسم</small></div></div>
+          <label class="upload-box" id="personDrop">
+            <input id="personInput" type="file" accept="image/*" hidden />
+            <div class="upload-icon">＋</div>
+            <strong>ارفع صورتك</strong>
+            <span>PNG / JPG / WEBP</span>
+            <img id="personPreview" class="preview hidden" alt="صورتك" />
+          </label>
+
+          <div class="step"><span>2</span><div><b>صورة اللبس</b><small>القطعة اللي عايز تجربها</small></div></div>
+          <label class="upload-box" id="outfitDrop">
+            <input id="outfitInput" type="file" accept="image/*" hidden />
+            <div class="upload-icon">＋</div>
+            <strong>ارفع اللبس</strong>
+            <span>صورة واضحة للقطعة</span>
+            <img id="outfitPreview" class="preview hidden" alt="اللبس" />
+          </label>
+
+          <div id="videoOnly" class="video-only hidden">
+            <div class="step"><span>3</span><div><b>فيديو الحركة</b><small>اختياري للفيديو</small></div></div>
+            <label class="upload-box compact">
+              <input id="motionInput" type="file" accept="video/*" hidden />
+              <div class="upload-icon">▶</div>
+              <strong>ارفع فيديو</strong>
+              <span>MP4 / MOV — يفضل 5–10 ثواني</span>
+              <video id="motionPreview" class="preview hidden" controls></video>
+            </label>
+          </div>
+
+          <div class="settings">
+            <label>ستايل النتيجة
+              <select id="styleSelect">
+                <option>Natural / Realistic</option>
+                <option>Studio Fashion</option>
+                <option>Streetwear</option>
+                <option>Luxury Editorial</option>
+              </select>
+            </label>
+            <label>نسبة العرض
+              <select id="ratioSelect">
+                <option value="9:16">9:16 — Reels</option>
+                <option value="1:1">1:1 — Square</option>
+                <option value="4:5">4:5 — Feed</option>
+              </select>
+            </label>
+          </div>
+
+          <button class="generate" id="generateBtn">
+            <span>✨</span> جرّب اللبس بالـ AI
+          </button>
+          <div id="status" class="status"></div>
+        </aside>
+
+        <section class="result-panel">
+          <div class="result-head">
+            <div><b id="resultTitle">Preview Studio</b><span id="resultSub">ارفع الملفات وشوف المعاينة هنا</span></div>
+            <button class="icon-btn" id="clearBtn">مسح</button>
+          </div>
+
+          <div class="canvas" id="canvas">
+            <div class="empty-state" id="emptyState">
+              <div class="spark">✦</div>
+              <h3>النتيجة هتظهر هنا</h3>
+              <p>ارفع صورتك واللبس ثم اضغط «جرّب اللبس بالـ AI».</p>
+            </div>
+            <div class="demo-result hidden" id="demoResult">
+              <div class="result-badge">AI PREVIEW</div>
+              <img id="resultPerson" alt="نتيجة المعاينة" />
+              <div class="outfit-overlay" id="outfitOverlay">
+                <img id="resultOutfit" alt="اللبس" />
+              </div>
+              <div class="demo-note">DEMO PREVIEW — النتيجة الحقيقية تحتاج ربط مزود AI</div>
+            </div>
+            <div class="loading hidden" id="loading">
+              <div class="loader"></div>
+              <b>بنجهز النتيجة...</b>
+              <span id="loadingText">تحليل الصورة واللبس</span>
+            </div>
+          </div>
+
+          <div class="result-actions">
+            <button class="secondary" id="downloadBtn" disabled>⬇ حفظ النتيجة</button>
+            <button class="secondary" id="shareBtn">↗ مشاركة</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="how" class="info-grid">
+      <div class="info-card"><div class="num">01</div><h3>Upload</h3><p>صورتك + صورة اللبس في ثواني.</p></div>
+      <div class="info-card"><div class="num">02</div><h3>AI Try-On</h3><p>الموقع مجهز ليرسل الملفات إلى مزود AI من السيرفر.</p></div>
+      <div class="info-card"><div class="num">03</div><h3>Image / Video</h3><p>صورة ثابتة أو فيديو حركة حسب التبويب.</p></div>
+    </section>
+
+    <section id="history" class="history">
+      <div class="section-head"><h2>آخر المعاينات</h2><span>محلية على جهازك</span></div>
+      <div id="historyGrid" class="history-grid"></div>
+    </section>
+  </main>
+
+  <footer>Yosef Try-On Studio · Built for AI fashion experiments</footer>
+  <script>
+
+const $ = (s) => document.querySelector(s);
+const tabs = document.querySelectorAll(".tab");
+let currentTab = "image";
+let personFile = null, outfitFile = null, motionFile = null;
+let personURL = "", outfitURL = "";
+
+tabs.forEach(tab => tab.addEventListener("click", () => {
+  tabs.forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  currentTab = tab.dataset.tab;
+  $("#videoOnly").classList.toggle("hidden", currentTab !== "video");
+  $("#resultTitle").textContent = currentTab === "video" ? "Video Preview Studio" : "Preview Studio";
+}));
+
+function bindUpload(input, box, preview, kind) {
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (file) setFile(file, box, preview, kind);
+  });
+  box.addEventListener("dragover", e => { e.preventDefault(); box.style.borderColor = "#8b5cf6"; });
+  box.addEventListener("dragleave", () => box.style.borderColor = "");
+  box.addEventListener("drop", e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) setFile(file, box, preview, kind);
+  });
+}
+function setFile(file, box, preview, kind) {
+  if (kind !== "motion" && !file.type.startsWith("image/")) return;
+  if (kind === "motion" && !file.type.startsWith("video/")) return;
+  box.classList.add("has-file");
+  preview.classList.remove("hidden");
+  const url = URL.createObjectURL(file);
+  preview.src = url;
+  if (kind === "person") { personFile = file; personURL = url; }
+  if (kind === "outfit") { outfitFile = file; outfitURL = url; }
+  if (kind === "motion") motionFile = file;
+}
+bindUpload($("#personInput"), $("#personDrop"), $("#personPreview"), "person");
+bindUpload($("#outfitInput"), $("#outfitDrop"), $("#outfitPreview"), "outfit");
+bindUpload($("#motionInput"), $("#videoOnly .upload-box"), $("#motionPreview"), "motion");
+
+$("#generateBtn").addEventListener("click", async () => {
+  if (!personFile || !outfitFile) {
+    setStatus("ارفع صورتك وصورة اللبس الأول.", true);
+    return;
+  }
+  const btn = $("#generateBtn");
+  btn.disabled = true;
+  $("#emptyState").classList.add("hidden");
+  $("#demoResult").classList.add("hidden");
+  $("#loading").classList.remove("hidden");
+
+  const steps = ["تحليل الشخص...", "تحليل قطعة اللبس...", "تجهيز المشهد...", "إنشاء المعاينة..."];
+  for (let i = 0; i < steps.length; i++) {
+    $("#loadingText").textContent = steps[i];
+    await new Promise(r => setTimeout(r, 550));
+  }
+
+  $("#loading").classList.add("hidden");
+  $("#demoResult").classList.remove("hidden");
+  $("#resultPerson").src = personURL;
+  $("#resultOutfit").src = outfitURL;
+  $("#downloadBtn").disabled = false;
+  setStatus("تم إنشاء المعاينة التجريبية. الربط بالـ AI الحقيقي يحتاج Backend + API.");
+  btn.disabled = false;
+});
+
+$("#downloadBtn").addEventListener("click", () => {
+  const img = $("#resultPerson");
+  if (!img.src) return;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const image = new Image();
+  image.onload = () => {
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    ctx.drawImage(image, 0, 0);
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/jpeg", .92);
+    a.download = "yosef-tryon-preview.jpg";
+    a.click();
+  };
+  image.src = img.src;
+});
+
+$("#shareBtn").addEventListener("click", async () => {
+  if (navigator.share) await navigator.share({title:"Yosef Try-On Studio",text:"شوف تجربة اللبس بالـ AI"});
+  else setStatus("ميزة المشاركة تعتمد على دعم المتصفح.");
+});
+$("#clearBtn").addEventListener("click", () => location.reload());
+$("#modeBtn").textContent = "Browser Demo";
+
+function setStatus(msg, error=false) {
+  $("#status").textContent = msg;
+  $("#status").style.color = error ? "#ff8b9c" : "#9297a8";
+}
+
+  </script>
+</body>
+</html>
