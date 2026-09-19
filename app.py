@@ -1,14 +1,15 @@
+import io
 import os
-import base64
-import json
-import urllib.request
-import urllib.error
+import tempfile
+from pathlib import Path
 
 import streamlit as st
 from PIL import Image
+from gradio_client import Client, handle_file
 
 # ============================================================
-# YOSEF AI TRY-ON STUDIO — Gemini Image Edition
+# YOSEF AI — TRY-ON STUDIO
+# Free AI backend: Hugging Face Gradio / ZeroGPU Space
 # ============================================================
 
 st.set_page_config(
@@ -17,335 +18,423 @@ st.set_page_config(
     layout="wide",
 )
 
-# -----------------------------
-# Styling
-# -----------------------------
 st.markdown("""
 <style>
-    .stApp {
-        background:
-            radial-gradient(circle at 15% 0%, rgba(125, 72, 255, .18), transparent 28%),
-            radial-gradient(circle at 90% 10%, rgba(0, 220, 170, .12), transparent 25%),
-            #090b12;
-        color: #f7f7fb;
-    }
-    section[data-testid="stSidebar"] { background: #10131c; }
-    .hero { padding: 28px 10px 18px; text-align: center; }
-    .hero h1 { font-size: 42px; margin-bottom: 5px; font-weight: 800; }
-    .hero p { color: #a7a9b6; font-size: 16px; }
-    .card {
-        background: rgba(25, 28, 39, .78);
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: 22px;
-        padding: 22px;
-        margin-bottom: 18px;
-        box-shadow: 0 15px 45px rgba(0,0,0,.20);
-    }
-    .badge {
-        display: inline-block;
-        padding: 7px 12px;
-        border-radius: 999px;
-        background: rgba(142, 92, 255, .16);
-        color: #cbb7ff;
-        font-size: 13px;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-    .small { color: #9fa3b5; font-size: 13px; }
-    div.stButton > button {
-        width: 100%;
-        border-radius: 14px;
-        min-height: 50px;
-        font-weight: 800;
-    }
+.stApp {
+    background:
+        radial-gradient(circle at 10% 10%, #10223d 0%, transparent 32%),
+        radial-gradient(circle at 90% 10%, #182b20 0%, transparent 30%),
+        #080b12;
+    color: #f7f7fb;
+}
+.block-container {max-width: 1150px; padding-top: 2rem;}
+.hero {
+    padding: 28px;
+    border-radius: 24px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(16,22,34,.82);
+    margin-bottom: 22px;
+}
+.hero h1 {font-size: 42px; margin: 0 0 8px 0;}
+.hero p {color: #aeb8c8; margin: 0;}
+.card {
+    padding: 20px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(17,23,35,.75);
+    margin-bottom: 18px;
+}
+.badge {
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:999px;
+    background:#123d2b;
+    color:#8ff0bd;
+    font-size:13px;
+    margin-bottom:10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-
-# -----------------------------
-# Gemini
-# -----------------------------
-def get_gemini_key():
-    try:
-        key = st.secrets.get("GEMINI_API_KEY")
-        if key:
-            return str(key).strip()
-    except Exception:
-        pass
-
-    key = os.getenv("GEMINI_API_KEY")
-    return key.strip() if key else None
-
-
-def image_block(uploaded_file):
-    data = uploaded_file.getvalue()
-    encoded = base64.b64encode(data).decode("utf-8")
-    mime = uploaded_file.type or "image/jpeg"
-    return {
-        "type": "image",
-        "mime_type": mime,
-        "data": encoded,
-    }
-
-
-def try_on_with_gemini(person_file, outfit_file, style, aspect):
-    api_key = get_gemini_key()
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY غير موجود في Streamlit Secrets."
-        )
-
-    prompt = f"""
-Create a photorealistic fashion virtual try-on image.
-
-REFERENCE ORDER:
-1. The first image is the person/model.
-2. The second image is the clothing/outfit.
-
-TASK:
-Put the exact clothing from the second image onto the person in the first image.
-
-IMPORTANT:
-- Preserve the person's face, identity, skin tone, body proportions and natural appearance.
-- Preserve the garment's color, design, pattern, material, logos and important details.
-- Make the garment fit naturally with realistic folds, shadows and lighting.
-- Do not change the person's face or hairstyle.
-- Do not add extra people.
-- Keep the result realistic, like professional fashion photography.
-- Prefer a full-body composition when possible.
-- Style: {style}.
-- Output aspect ratio: {aspect}.
-""".strip()
-
-    payload = {
-        "model": "gemini-3.1-flash-image",
-        "input": [
-            image_block(person_file),
-            image_block(outfit_file),
-            {"type": "text", "text": prompt},
-        ],
-        "response_format": {
-            "type": "image",
-            "aspect_ratio": aspect,
-            "image_size": "1K",
-        },
-    }
-
-    body = json.dumps(payload).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/interactions",
-        data=body,
-        headers={
-            "x-goog-api-key": api_key,
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=180) as response:
-            raw = response.read().decode("utf-8")
-            result = json.loads(raw)
-    except urllib.error.HTTPError as e:
-        details = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Gemini API HTTP {e.code}: {details}") from e
-    except Exception as e:
-        raise RuntimeError(f"تعذر الاتصال بـ Gemini: {e}") from e
-
-    # Current Interactions API normally exposes output_image directly.
-    output_image = result.get("output_image")
-    if isinstance(output_image, dict):
-        data = output_image.get("data")
-        if data:
-            return base64.b64decode(data)
-
-    # Fallback: inspect model output steps.
-    for step in result.get("steps", []):
-        for block in step.get("content", []) or step.get("summary", []):
-            if isinstance(block, dict) and block.get("type") == "image":
-                data = block.get("data")
-                if data:
-                    return base64.b64decode(data)
-
-    raise RuntimeError(
-        "Gemini رجّع استجابة بدون صورة. جرّب مرة أخرى، ولو ظهر نفس الخطأ ابعتلي نص الخطأ."
-    )
-
-
-# -----------------------------
-# Header
-# -----------------------------
 st.markdown("""
 <div class="hero">
-    <div class="badge">🍌 GEMINI AI FASHION TRY-ON</div>
-    <h1>YOSEF AI — TRY-ON STUDIO</h1>
-    <p>ارفع صورة الشخص + صورة اللبس، وخلي Gemini يعمل تجربة اللبس بالـAI.</p>
+    <div class="badge">● FREE AI BACKEND</div>
+    <h1>👕 YOSEF AI — TRY-ON STUDIO</h1>
+    <p>ارفع صورة الشخص وصورة اللبس، وسيتم تنفيذ الـ Virtual Try-On بالـAI.</p>
 </div>
 """, unsafe_allow_html=True)
 
 
-# -----------------------------
-# Sidebar
-# -----------------------------
-with st.sidebar:
-    st.markdown("## ⚙️ إعدادات التجربة")
+# ----------------------------
+# Backend configuration
+# ----------------------------
+# You can override these later from Streamlit Secrets:
+# HF_SPACE_ID = "yourname/your-space"
+# HF_TOKEN = "hf_..."
+SPACE_ID = st.secrets.get("HF_SPACE_ID", "tryitonvirtual/virtual-tryon")
+HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
-    mode = st.radio(
-        "نوع التجربة",
-        ["📸 صورة", "🎬 فيديو"],
-        index=0,
-    )
+if "client" not in st.session_state:
+    st.session_state.client = None
+if "api_info" not in st.session_state:
+    st.session_state.api_info = None
+if "api_name" not in st.session_state:
+    st.session_state.api_name = None
 
-    style = st.selectbox(
-        "ستايل النتيجة",
-        [
-            "Natural / Realistic",
-            "Studio Fashion",
-            "Streetwear",
-            "Luxury Fashion",
-            "E-commerce",
-        ],
-    )
 
-    ratio = st.selectbox(
-        "نسبة العرض",
-        [
-            "9:16 — Reels",
-            "1:1 — Square",
-            "4:5 — Instagram",
-            "16:9 — Landscape",
-        ],
-    )
-
-    st.markdown("---")
-    st.markdown("### 🔐 AI")
-
-    if get_gemini_key():
-        st.success("Gemini API متصل")
-    else:
-        st.warning("أضف GEMINI_API_KEY في Streamlit Secrets.")
-
-    st.markdown(
-        '<div class="small">المفتاح لا يتم وضعه داخل app.py.</div>',
-        unsafe_allow_html=True,
-    )
-
-    if mode == "🎬 فيديو":
-        st.info(
-            "نسخة Gemini الحالية تعمل على تجربة الملابس بالصور. "
-            "الفيديو سنضيفه لاحقًا بمحرك فيديو مناسب."
+def connect_backend():
+    if st.session_state.client is None:
+        st.session_state.client = Client(
+            SPACE_ID,
+            token=HF_TOKEN if HF_TOKEN else None,
+            verbose=False,
+        )
+    if st.session_state.api_info is None:
+        st.session_state.api_info = st.session_state.client.view_api(
+            all_endpoints=True,
+            print_info=False,
+            return_format="dict",
         )
 
+    named = st.session_state.api_info.get("named_endpoints", {})
+    unnamed = st.session_state.api_info.get("unnamed_endpoints", {})
 
-# -----------------------------
+    # Prefer an endpoint with 2+ inputs and an image/file output.
+    candidates = []
+
+    for name, info in named.items():
+        params = info.get("parameters", [])
+        returns = info.get("returns", [])
+        score = 0
+
+        if len(params) >= 2:
+            score += 5
+
+        components = " ".join(
+            str(p.get("component", "")).lower() for p in params
+        )
+        return_components = " ".join(
+            str(r.get("component", "")).lower() for r in returns
+        )
+
+        if "image" in components:
+            score += 3
+        if "image" in return_components or "file" in return_components:
+            score += 5
+        if any(
+            word in name.lower()
+            for word in ("try", "tryon", "try-on", "generate", "predict", "inference")
+        ):
+            score += 4
+
+        candidates.append((score, name, info))
+
+    if not candidates:
+        raise RuntimeError("لم يتم العثور على API مناسب داخل الـSpace.")
+
+    candidates.sort(reverse=True, key=lambda x: x[0])
+    _, api_name, info = candidates[0]
+
+    st.session_state.api_name = api_name
+    return st.session_state.client, api_name, info
+
+
+def save_uploaded(uploaded, suffix=".png"):
+    data = uploaded.getvalue()
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    os.close(fd)
+    with open(path, "wb") as f:
+        f.write(data)
+    return path
+
+
+def choose_input_values(parameters, person_path, outfit_path):
+    """
+    Build arguments for the discovered Gradio endpoint.
+    We map image inputs by their labels and use defaults for
+    extra parameters when the Space exposes them.
+    """
+    values = {}
+
+    image_slots = []
+    for p in parameters:
+        component = str(p.get("component", "")).lower()
+        label = str(p.get("label", "")).lower()
+        python_type = str(p.get("python_type", "")).lower()
+
+        is_image = (
+            component in {"image", "file"}
+            or "filepath" in python_type
+            or "image" in label
+            or "photo" in label
+            or "garment" in label
+            or "cloth" in label
+            or "person" in label
+        )
+
+        if is_image:
+            image_slots.append(p)
+
+    used_person = False
+    used_outfit = False
+
+    for p in parameters:
+        label = str(p.get("label", "")).lower()
+        component = str(p.get("component", "")).lower()
+        name = p.get("parameter_name") or p.get("label")
+
+        if not name:
+            continue
+
+        # Strong label matching first.
+        if any(x in label for x in ("garment", "cloth", "clothing", "outfit", "dress")):
+            values[name] = handle_file(outfit_path)
+            used_outfit = True
+            continue
+
+        if any(x in label for x in ("person", "human", "model", "photo", "background", "source")):
+            values[name] = handle_file(person_path)
+            used_person = True
+            continue
+
+        # Defaults for common optional settings.
+        if component == "checkbox":
+            values[name] = True
+        elif component in {"number", "slider"}:
+            example = p.get("example_input")
+            if isinstance(example, (int, float)):
+                values[name] = example
+        elif component in {"radio", "dropdown"}:
+            example = p.get("example_input")
+            if example not in (None, ""):
+                values[name] = example
+
+    # Fallback: map the first image-like inputs to person then outfit.
+    remaining = [
+        p for p in image_slots
+        if (p.get("parameter_name") or p.get("label")) not in values
+    ]
+
+    if not used_person and remaining:
+        name = remaining.pop(0).get("parameter_name") or remaining[0].get("label")
+        values[name] = handle_file(person_path)
+
+    if not used_outfit and remaining:
+        name = remaining.pop(0).get("parameter_name") or remaining[0].get("label")
+        values[name] = handle_file(outfit_path)
+
+    # If the endpoint needs a category/type and did not provide an example,
+    # use a conventional upper-body value.
+    for p in parameters:
+        name = p.get("parameter_name") or p.get("label")
+        if not name or name in values:
+            continue
+        label = str(p.get("label", "")).lower()
+        component = str(p.get("component", "")).lower()
+
+        if component in {"radio", "dropdown"} and any(
+            x in label for x in ("category", "type", "garment type", "clothing type")
+        ):
+            values[name] = "upperbody"
+
+    return values
+
+
+def extract_result(result):
+    """Find an image/file path or URL inside Gradio's returned object."""
+    if result is None:
+        return None
+
+    if isinstance(result, (str, Path)):
+        value = str(result)
+        if os.path.exists(value):
+            return value
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+
+    if isinstance(result, dict):
+        for key in ("path", "url", "image", "output", "result"):
+            if key in result:
+                found = extract_result(result[key])
+                if found:
+                    return found
+        for value in result.values():
+            found = extract_result(value)
+            if found:
+                return found
+
+    if isinstance(result, (list, tuple)):
+        for item in result:
+            found = extract_result(item)
+            if found:
+                return found
+
+    return None
+
+
+def load_result_image(result):
+    path_or_url = extract_result(result)
+    if not path_or_url:
+        return None, None
+
+    if path_or_url.startswith(("http://", "https://")):
+        import requests
+        r = requests.get(path_or_url, timeout=60)
+        r.raise_for_status()
+        image = Image.open(io.BytesIO(r.content)).convert("RGB")
+        return image, r.content
+
+    with open(path_or_url, "rb") as f:
+        data = f.read()
+    image = Image.open(io.BytesIO(data)).convert("RGB")
+    return image, data
+
+
+# ----------------------------
 # Inputs
-# -----------------------------
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown("### 👤 1 — صورة الشخص")
-person_file = st.file_uploader(
-    "ارفع صورة واضحة للشخص",
-    type=["jpg", "jpeg", "png", "webp"],
-    key="person",
-)
-st.markdown("</div>", unsafe_allow_html=True)
+# ----------------------------
+col1, col2 = st.columns(2)
 
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown("### 👕 2 — صورة اللبس")
-outfit_file = st.file_uploader(
-    "ارفع صورة واضحة للملابس / اللوك",
-    type=["jpg", "jpeg", "png", "webp"],
-    key="outfit",
-)
-st.markdown("</div>", unsafe_allow_html=True)
+with col1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### 👤 1 — صورة الشخص")
+    person_file = st.file_uploader(
+        "ارفع صورة واضحة للشخص",
+        type=["jpg", "jpeg", "png", "webp"],
+        key="person",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with col2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### 👕 2 — صورة اللبس")
+    outfit_file = st.file_uploader(
+        "ارفع صورة واضحة للملابس / القطعة",
+        type=["jpg", "jpeg", "png", "webp"],
+        key="outfit",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
+# ----------------------------
 # Preview
+# ----------------------------
 if person_file or outfit_file:
-    cols = st.columns(2)
-
+    c1, c2 = st.columns(2)
     if person_file:
-        with cols[0]:
+        with c1:
             st.markdown("**👤 الشخص**")
             st.image(person_file, use_container_width=True)
-
     if outfit_file:
-        with cols[1]:
+        with c2:
             st.markdown("**👕 اللبس**")
             st.image(outfit_file, use_container_width=True)
 
 
-# -----------------------------
-# Generate
-# -----------------------------
+# ----------------------------
+# Controls
+# ----------------------------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
-if mode == "📸 صورة":
-    if st.button("✨ جرّب اللبس بالـAI", type="primary", use_container_width=True):
+style = st.selectbox(
+    "🎨 الستايل",
+    ["Realistic", "Studio", "Natural"],
+    index=0,
+)
 
-        if not get_gemini_key():
-            st.error("مفتاح Gemini غير موجود في Streamlit Secrets.")
-            st.stop()
-
-        if not person_file:
-            st.error("ارفع صورة الشخص أولًا.")
-            st.stop()
-
-        if not outfit_file:
-            st.error("ارفع صورة اللبس أولًا.")
-            st.stop()
-
-        ratio_map = {
-            "9:16 — Reels": "9:16",
-            "1:1 — Square": "1:1",
-            "4:5 — Instagram": "4:5",
-            "16:9 — Landscape": "16:9",
-        }
-        aspect = ratio_map.get(ratio, "9:16")
-
-        progress = st.progress(0)
-        status = st.empty()
-
-        try:
-            status.info("📤 جاري تجهيز الصور...")
-            progress.progress(15)
-
-            status.info("🧠 Gemini بيعمل الـAI Try-On...")
-            progress.progress(35)
-
-            result_bytes = try_on_with_gemini(
-                person_file,
-                outfit_file,
-                style,
-                aspect,
-            )
-
-            progress.progress(90)
-            status.success("✅ النتيجة جاهزة!")
-            progress.progress(100)
-
-            st.markdown("## ✨ النتيجة")
-
-            result_image = Image.open(__import__("io").BytesIO(result_bytes))
-            st.image(result_image, use_container_width=True)
-
-            st.download_button(
-                "⬇️ حفظ الصورة",
-                data=result_bytes,
-                file_name="yosef_ai_tryon.png",
-                mime="image/png",
-                use_container_width=True,
-            )
-
-        except Exception as e:
-            st.error("حصل خطأ أثناء تنفيذ Gemini AI.")
-            st.code(str(e))
-
-else:
-    st.info("اختار 📸 صورة للتجربة الحالية.")
+ratio = st.selectbox(
+    "📐 المقاس",
+    ["9:16 — Reels", "1:1 — Square", "4:5 — Instagram", "16:9 — Landscape"],
+    index=0,
+)
 
 st.markdown("</div>", unsafe_allow_html=True)
 
+
+# ----------------------------
+# Generate
+# ----------------------------
+if st.button("✨ جرّب اللبس بالـAI", use_container_width=True, type="primary"):
+
+    if not person_file:
+        st.error("ارفع صورة الشخص أولًا.")
+        st.stop()
+
+    if not outfit_file:
+        st.error("ارفع صورة اللبس أولًا.")
+        st.stop()
+
+    person_path = save_uploaded(person_file, ".png")
+    outfit_path = save_uploaded(outfit_file, ".png")
+
+    progress = st.progress(0)
+    status = st.empty()
+
+    try:
+        status.info("🔗 الاتصال بمحرك الـAI...")
+        progress.progress(15)
+
+        client, api_name, endpoint_info = connect_backend()
+
+        status.info(f"🧠 تجهيز Virtual Try-On...  ({api_name})")
+        progress.progress(30)
+
+        parameters = endpoint_info.get("parameters", [])
+        kwargs = choose_input_values(parameters, person_path, outfit_path)
+
+        if len(kwargs) < 2:
+            raise RuntimeError(
+                "الـAPI لم يتعرف على صور الشخص واللبس. "
+                "لو ظهر هذا الخطأ، ابعتلي صورة الخطأ وسأظبط الـmapping."
+            )
+
+        status.info("🎨 الـAI بيعمل الـTry-On الآن...")
+        progress.progress(45)
+
+        job = client.submit(
+            api_name=api_name,
+            **kwargs,
+        )
+
+        result = job.result()
+        progress.progress(90)
+
+        result_image, result_bytes = load_result_image(result)
+
+        if result_image is None:
+            raise RuntimeError(
+                f"تم تنفيذ الـAPI لكن لم أستطع استخراج صورة النتيجة.\n\n"
+                f"Raw result: {result}"
+            )
+
+        progress.progress(100)
+        status.success("✅ خلصت! النتيجة جاهزة.")
+
+        st.markdown("## ✨ النتيجة")
+        st.image(result_image, use_container_width=True)
+
+        st.download_button(
+            "⬇️ حفظ الصورة",
+            data=result_bytes,
+            file_name="yosef_ai_tryon.png",
+            mime="image/png",
+            use_container_width=True,
+        )
+
+    except Exception as e:
+        progress.empty()
+        status.empty()
+        st.error("❌ حصل خطأ أثناء تنفيذ الـAI")
+        st.code(str(e))
+
+    finally:
+        for p in (person_path, outfit_path):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+
 st.caption(
-    "Powered by Google Gemini API • لا تضع مفاتيح API داخل GitHub أو داخل الكود."
+    "YOSEF AI • Virtual Try-On • Hugging Face Gradio backend"
 )
