@@ -1,241 +1,262 @@
 import os
-import io
+import re
+import json
+import subprocess
 import tempfile
+from io import BytesIO
 
+import requests
 import streamlit as st
-from PIL import Image
-from gradio_client import Client, handle_file
+from PIL import Image, ImageDraw, ImageFont
+from gtts import gTTS
+import imageio_ffmpeg
 
-# ============================================================
-# YOSEF AI — TRY-ON STUDIO
-# Free backend: Hugging Face ZeroGPU / IDM-VTON
-# ============================================================
+APP_NAME = "Yosef AI Video"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-st.set_page_config(
-    page_title="Yosef AI — Try-On Studio",
-    page_icon="👕",
-    layout="wide",
-)
+st.set_page_config(page_title=APP_NAME, page_icon="🎬", layout="wide")
 
-st.markdown("""
-<style>
-.stApp {
-    background:
-        radial-gradient(circle at 10% 10%, #10223d 0%, transparent 32%),
-        radial-gradient(circle at 90% 10%, #182b20 0%, transparent 30%),
-        #080b12;
-    color: #f7f7fb;
-}
-.block-container {max-width: 1150px; padding-top: 2rem;}
-.hero {
-    padding: 30px;
-    border-radius: 24px;
-    border: 1px solid rgba(255,255,255,.12);
-    background: rgba(16,22,34,.86);
-    margin-bottom: 22px;
-}
-.hero h1 {font-size: 42px; margin: 0 0 8px 0;}
-.hero p {color: #aeb8c8; margin: 0;}
-.card {
-    padding: 20px;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,.10);
-    background: rgba(17,23,35,.78);
-    margin-bottom: 18px;
-}
-.badge {
-    display:inline-block;
-    padding:6px 12px;
-    border-radius:999px;
-    background:#123d2b;
-    color:#8ff0bd;
-    font-size:13px;
-    margin-bottom:10px;
-}
-</style>
-""", unsafe_allow_html=True)
+st.title("🎬 Yosef AI Video")
+st.caption("حوّل فكرة إلى سيناريو + صور AI + صوت عربي + فيديو MP4")
 
-st.markdown("""
-<div class="hero">
-    <div class="badge">● FREE AI VIRTUAL TRY-ON</div>
-    <h1>👕 YOSEF AI — TRY-ON STUDIO</h1>
-    <p>ارفع صورة الشخص وصورة اللبس، والـAI هيعمل Virtual Try-On.</p>
-</div>
-""", unsafe_allow_html=True)
+def get_secret(name):
+    try:
+        return st.secrets.get(name, "")
+    except Exception:
+        return os.getenv(name, "")
 
-# Free Hugging Face Space.
-# It is currently running on ZeroGPU and exposes the IDM-VTON /tryon API.
-SPACE_ID = "yisol/IDM-VTON"
-HF_TOKEN = st.secrets.get("HF_TOKEN", "")
-
-def save_upload(uploaded, suffix=".png"):
-    fd, path = tempfile.mkstemp(suffix=suffix)
-    os.close(fd)
-    with open(path, "wb") as f:
-        f.write(uploaded.getvalue())
-    return path
-
-def run_tryon(person_path, garment_path, garment_description):
-    client = Client(
-        SPACE_ID,
-        token=HF_TOKEN if HF_TOKEN else None,
-        verbose=False,
-    )
-
-    # IDM-VTON's documented Gradio endpoint is /tryon.
-    result = client.predict(
-        dict={
-            "background": handle_file(person_path),
-            "layers": [],
-            "composite": None,
+def call_ai(api_key, prompt, model):
+    r = requests.post(
+        OPENROUTER_URL,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "X-Title": APP_NAME,
         },
-        garm_img=handle_file(garment_path),
-        garment_des=garment_description,
-        is_checked=True,
-        is_checked_crop=False,
-        denoise_steps=30,
-        seed=42,
-        api_name="/tryon",
+        json={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "Return only valid JSON. No markdown."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.7,
+        },
+        timeout=120,
     )
+    if r.status_code != 200:
+        raise RuntimeError(f"OpenRouter HTTP {r.status_code}: {r.text}")
+    return r.json()["choices"][0]["message"]["content"]
 
-    # The first returned value is the generated try-on image.
-    if isinstance(result, (list, tuple)) and len(result) > 0:
-        result = result[0]
+def parse_json(text):
+    text = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.I)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except Exception:
+        m = re.search(r"\{.*\}", text, re.S)
+        if not m:
+            raise ValueError("AI لم يرجع JSON صالح.")
+        return json.loads(m.group(0))
 
-    if isinstance(result, dict):
-        result = result.get("path") or result.get("url") or result.get("image")
+def make_plan(api_key, idea, seconds, style, model):
+    prompt = f"""
+Create a short vertical video plan.
 
-    if not result:
-        raise RuntimeError("الـAI رجّع نتيجة فارغة.")
+Idea: {idea}
+Target duration: {seconds} seconds
+Style: {style}
 
-    if isinstance(result, str) and result.startswith(("http://", "https://")):
-        import requests
-        response = requests.get(result, timeout=60)
-        response.raise_for_status()
-        data = response.content
-    else:
-        with open(str(result), "rb") as f:
-            data = f.read()
+Return ONLY:
+{{
+  "title": "Arabic title",
+  "scenes": [
+    {{
+      "scene": 1,
+      "narration": "Arabic narration",
+      "image_prompt": "English cinematic image prompt, no text in image",
+      "caption": "short Arabic caption"
+    }}
+  ]
+}}
 
-    image = Image.open(io.BytesIO(data)).convert("RGB")
-    return image, data
+Rules:
+- Exactly 6 scenes.
+- Arabic narration.
+- Keep total narration suitable for the requested duration.
+- Keep the main character visually consistent.
+- Image prompts should be detailed and suitable for vertical 9:16 images.
+"""
+    return parse_json(call_ai(api_key, prompt, model))
 
+def download_image(prompt, out_path):
+    url = "https://image.pollinations.ai/prompt/" + requests.utils.quote(prompt, safe="")
+    url += "?width=720&height=1280&nologo=true"
+    r = requests.get(url, timeout=120)
+    if r.status_code != 200:
+        raise RuntimeError(f"Image API HTTP {r.status_code}")
+    Image.open(BytesIO(r.content)).convert("RGB").save(out_path, quality=92)
 
-# ----------------------------
-# Inputs
-# ----------------------------
-col1, col2 = st.columns(2)
+def make_caption_image(image_path, caption, out_path):
+    img = Image.open(image_path).convert("RGB")
+    draw = ImageDraw.Draw(img, "RGBA")
+    w, h = img.size
+    draw.rectangle((0, int(h*0.78), w, h), fill=(0,0,0,170))
 
-with col1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 👤 1 — صورة الشخص")
-    person_file = st.file_uploader(
-        "ارفع صورة واضحة للشخص",
-        type=["jpg", "jpeg", "png", "webp"],
-        key="person",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    font_path = next((x for x in font_candidates if os.path.exists(x)), None)
+    font = ImageFont.truetype(font_path, 34) if font_path else None
 
-with col2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### 👕 2 — صورة اللبس")
-    outfit_file = st.file_uploader(
-        "ارفع صورة واضحة للملابس",
-        type=["jpg", "jpeg", "png", "webp"],
-        key="outfit",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    words = caption.split()
+    lines, line = [], ""
+    for word in words:
+        test = (line + " " + word).strip()
+        if len(test) <= 28:
+            line = test
+        else:
+            if line:
+                lines.append(line)
+            line = word
+    if line:
+        lines.append(line)
 
-if person_file or outfit_file:
-    c1, c2 = st.columns(2)
-    if person_file:
-        with c1:
-            st.markdown("**👤 الشخص**")
-            st.image(person_file, use_container_width=True)
-    if outfit_file:
-        with c2:
-            st.markdown("**👕 اللبس**")
-            st.image(outfit_file, use_container_width=True)
+    y = int(h*0.82)
+    for line in lines[:3]:
+        box = draw.textbbox((0,0), line, font=font)
+        x = max(20, (w - (box[2]-box[0]))//2)
+        draw.text((x, y), line, fill="white", font=font)
+        y += 45
 
-st.markdown('<div class="card">', unsafe_allow_html=True)
+    img.save(out_path, quality=92)
 
-garment_type = st.selectbox(
-    "👔 نوع اللبس",
-    ["Upper body / قميص أو تيشيرت أو جاكيت",
-     "Lower body / بنطلون أو شورت",
-     "Dress / فستان"],
-    index=0,
+def make_audio(text, out_path):
+    gTTS(text=text, lang="ar", slow=False).save(out_path)
+
+def run_ffmpeg(args):
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    cmd = [ffmpeg, "-y"] + args
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-4000:])
+
+def make_scene_video(image_path, audio_path, out_path):
+    # Still image + voice, encoded to a standard H.264/AAC MP4.
+    run_ffmpeg([
+        "-loop", "1", "-i", image_path,
+        "-i", audio_path,
+        "-c:v", "libx264", "-tune", "stillimage",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k",
+        "-shortest",
+        "-r", "24",
+        out_path,
+    ])
+
+def concat_videos(video_paths, output):
+    # Use concat demuxer; paths are temporary and contain no single quotes.
+    list_file = output + ".txt"
+    with open(list_file, "w", encoding="utf-8") as f:
+        for path in video_paths:
+            safe = path.replace("'", "'\\''")
+            f.write(f"file '{safe}'\n")
+    run_ffmpeg([
+        "-f", "concat", "-safe", "0",
+        "-i", list_file,
+        "-c", "copy",
+        output,
+    ])
+    try:
+        os.remove(list_file)
+    except OSError:
+        pass
+
+api_key = st.text_input(
+    "🔑 OpenRouter API Key",
+    value=get_secret("OPENROUTER_API_KEY"),
+    type="password",
 )
 
-if garment_type.startswith("Upper"):
-    garment_description = "a realistic upper-body garment, shirt, t-shirt or jacket"
-elif garment_type.startswith("Lower"):
-    garment_description = "realistic lower-body clothing, pants or shorts"
-else:
-    garment_description = "a realistic dress"
+model = st.selectbox(
+    "🤖 AI Model",
+    ["openrouter/free", "google/gemini-2.5-flash"],
+)
 
-st.markdown("</div>", unsafe_allow_html=True)
+idea = st.text_area(
+    "💡 فكرة الفيديو",
+    placeholder="مثال: شاب يتعلم الذكاء الاصطناعي ويصنع أول مشروع له.",
+    height=130,
+)
 
-# ----------------------------
-# Generate
-# ----------------------------
-if st.button("✨ جرّب اللبس بالـAI", use_container_width=True, type="primary"):
+c1, c2 = st.columns(2)
+with c1:
+    duration = st.slider("⏱️ المدة المستهدفة", 20, 120, 45, 5)
+with c2:
+    style = st.selectbox(
+        "🎨 الأسلوب",
+        ["Cinematic", "Realistic", "Motivational", "Storytelling", "Educational"],
+    )
 
-    if not person_file:
-        st.error("ارفع صورة الشخص أولًا.")
+if st.button("🚀 إنشاء الفيديو", type="primary", use_container_width=True):
+    if not api_key.strip():
+        st.error("❌ ضع OpenRouter API Key.")
         st.stop()
-
-    if not outfit_file:
-        st.error("ارفع صورة اللبس أولًا.")
+    if not idea.strip():
+        st.warning("⚠️ اكتب فكرة الفيديو.")
         st.stop()
-
-    person_path = save_upload(person_file)
-    garment_path = save_upload(outfit_file)
-
-    progress = st.progress(0)
-    status = st.empty()
 
     try:
-        status.info("🔗 الاتصال بمحرك الـAI المجاني...")
-        progress.progress(15)
+        with st.spinner("✍️ جاري كتابة السيناريو..."):
+            plan = make_plan(api_key, idea, duration, style, model)
 
-        status.info("📤 رفع الصور...")
-        progress.progress(30)
+        st.success("✅ تم إنشاء السيناريو")
 
-        status.info("🧠 الـAI بيعمل Virtual Try-On...")
-        progress.progress(45)
+        with st.expander("📜 عرض السيناريو"):
+            st.write(plan.get("title", "Yosef AI Video"))
+            for s in plan["scenes"]:
+                st.write(f"**المشهد {s.get('scene')}**")
+                st.write(s.get("narration", ""))
 
-        result_image, result_bytes = run_tryon(
-            person_path,
-            garment_path,
-            garment_description,
-        )
+        progress = st.progress(0)
+        status = st.empty()
 
-        progress.progress(100)
-        status.success("✅ خلصت! النتيجة جاهزة.")
+        with tempfile.TemporaryDirectory() as work:
+            videos = []
+            scenes = plan["scenes"]
 
-        st.markdown("## ✨ النتيجة")
-        st.image(result_image, use_container_width=True)
+            for i, scene in enumerate(scenes, 1):
+                status.write(f"🎬 تجهيز المشهد {i}/{len(scenes)}...")
+                image = os.path.join(work, f"scene_{i}.jpg")
+                final_image = os.path.join(work, f"scene_{i}_caption.jpg")
+                audio = os.path.join(work, f"voice_{i}.mp3")
+                video = os.path.join(work, f"scene_{i}.mp4")
 
+                prompt = scene.get("image_prompt", "") + ", vertical 9:16, cinematic, high detail, no text, no watermark"
+                download_image(prompt, image)
+                make_caption_image(image, scene.get("caption", ""), final_image)
+                make_audio(scene.get("narration", ""), audio)
+                make_scene_video(final_image, audio, video)
+
+                videos.append(video)
+                progress.progress(i / len(scenes))
+
+            status.write("🎞️ تجميع الفيديو النهائي...")
+            output = os.path.join(work, "Yosef_AI_Video.mp4")
+            concat_videos(videos, output)
+
+            video_bytes = open(output, "rb").read()
+
+        st.success("🎉 الفيديو جاهز!")
+        st.video(video_bytes)
         st.download_button(
-            "⬇️ حفظ الصورة",
-            data=result_bytes,
-            file_name="yosef_ai_tryon.png",
-            mime="image/png",
+            "⬇️ تحميل الفيديو",
+            video_bytes,
+            "Yosef_AI_Video.mp4",
+            "video/mp4",
             use_container_width=True,
         )
 
     except Exception as e:
-        progress.empty()
-        status.empty()
-        st.error("❌ حصل خطأ أثناء تشغيل الـAI")
+        st.error("❌ حصل خطأ")
         st.code(str(e))
-
-    finally:
-        for path in (person_path, garment_path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
-
-st.caption("YOSEF AI • Virtual Try-On • Hugging Face ZeroGPU")
